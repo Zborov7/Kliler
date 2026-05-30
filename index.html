@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Неон-Кликер</title>
+    <style>
+        :root {
+            --bg: #0b0b1a;
+            --card: #13132b;
+            --neon: #00f3ff;
+            --gold: #ffd700;
+            --danger: #ff4d6d;
+            --green: #2ecc71;
+            --text: #e0e0ff;
+            --muted: #7f8c9b;
+            --radius: 1.2rem;
+            --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 0.8rem;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            background-image: radial-gradient(circle at 20% 20%, #1a1a3e, var(--bg) 80%);
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 420px;
+            background: var(--card);
+            border-radius: 2rem;
+            padding: 1.5rem 1.2rem 1rem;
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.2), 0 20px 40px rgba(0,0,0,0.6);
+            border: 1px solid rgba(0, 243, 255, 0.15);
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+        }
+
+        /* === Верхняя панель: энергия и монеты === */
+        .top-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+        .balance {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            font-size: 2.2rem;
+            font-weight: 700;
+            text-shadow: 0 0 12px var(--gold);
+        }
+        .balance span { color: var(--gold); }
+        .energy-bar {
+            background: rgba(255,255,255,0.08);
+            height: 18px;
+            border-radius: 20px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.5);
+        }
+        .energy-fill {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #00c9ff, #92fe9d);
+            border-radius: 20px;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 15px #00c9ff80;
+        }
+        .energy-text {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.7rem;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 6px black;
+        }
+
+        /* === Основной кликер === */
+        .clicker-area {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        #clicker-img {
+            width: min(180px, 45vw);
+            height: min(180px, 45vw);
+            object-fit: cover;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.1s ease, filter 0.15s;
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.5);
+            border: 3px solid rgba(0, 243, 255, 0.6);
+            filter: drop-shadow(0 0 8px var(--neon));
+            -webkit-user-drag: none;
+        }
+        #clicker-img:active {
+            transform: scale(0.9);
+            filter: brightness(1.3) drop-shadow(0 0 15px var(--gold));
+        }
+        #clicker-img.no-energy {
+            filter: grayscale(0.7) brightness(0.6);
+            box-shadow: 0 0 15px rgba(255, 77, 109, 0.4);
+        }
+
+        .click-value {
+            position: absolute;
+            pointer-events: none;
+            font-weight: bold;
+            color: var(--gold);
+            text-shadow: 0 0 10px var(--gold);
+            animation: floatUp 0.9s ease-out forwards;
+        }
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-60px); }
+        }
+
+        /* === Вкладки === */
+        .tabs {
+            display: flex;
+            gap: 0.3rem;
+            background: rgba(255,255,255,0.03);
+            border-radius: 1.5rem;
+            padding: 0.3rem;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 0.7rem 0.3rem;
+            border: none;
+            background: transparent;
+            color: var(--muted);
+            border-radius: 1.2rem;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .tab-btn.active {
+            background: rgba(0, 243, 255, 0.15);
+            color: var(--neon);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+        }
+
+        .tab-content {
+            display: none;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .tab-content.active { display: flex; }
+
+        /* === Апгрейды === */
+        .upgrade-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255,255,255,0.03);
+            border-radius: 1rem;
+            padding: 0.8rem 1rem;
+            border: 1px solid rgba(255,255,255,0.05);
+            gap: 0.6rem;
+        }
+        .upgrade-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+        .upgrade-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .upgrade-desc {
+            font-size: 0.7rem;
+            color: var(--muted);
+        }
+        .upgrade-btn {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            border: none;
+            color: white;
+            font-weight: bold;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: var(--transition);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+            font-size: 0.85rem;
+        }
+        .upgrade-btn:disabled {
+            background: #3a3a5c;
+            color: #888;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+        .upgrade-btn:not(:disabled):active {
+            transform: scale(0.95);
+        }
+
+        /* === Достижения === */
+        .achievements-list {
+            max-height: 200px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .achievement {
+            background: rgba(255,255,255,0.03);
+            padding: 0.6rem 0.8rem;
+            border-radius: 0.8rem;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* === Уведомление === */
+        .popup {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2ecc71;
+            color: #000;
+            padding: 0.7rem 2rem;
+            border-radius: 2rem;
+            font-weight: bold;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+            z-index: 200;
+            opacity: 0;
+            transition: opacity 0.3s, top 0.3s;
+            pointer-events: none;
+        }
+        .popup.show {
+            opacity: 1;
+            top: 30px;
+        }
+
+        @media (max-width: 400px) {
+            .balance { font-size: 1.8rem; }
+            .upgrade-btn { padding: 0.4rem 0.8rem; font-size: 0.75rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <!-- Верхняя панель -->
+        <div class="top-panel">
+            <div class="balance">💎 <span id="coins-display">0</span></div>
+            <div class="energy-bar">
+                <div class="energy-fill" id="energy-fill" style="width: 100%;"></div>
+                <div class="energy-text" id="energy-text">100/100</div>
+            </div>
+        </div>
+
+        <!-- Кликер -->
+        <div class="clicker-area" id="clicker-area">
+            <img id="clicker-img" src="photo1.png" alt="Монета" draggable="false">
+        </div>
+
+        <!-- Вкладки -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="upgrades">⚡ Прокачка</button>
+            <button class="tab-btn" data-tab="achievements">🏆 Достижения</button>
+        </div>
+
+        <!-- Контент вкладок -->
+        <div class="tab-content active" id="tab-upgrades">
+            <div class="upgrade-item" id="upg-click">
+                <div class="upgrade-info">
+                    <div class="upgrade-name">💪 Сила клика</div>
+                    <div class="upgrade-desc">Уровень <span id="click-lvl">1</span> · +1 монета/клик</div>
+                </div>
+                <button class="upgrade-btn" id="btn-click-upg">50 💎</button>
+            </div>
+            <div class="upgrade-item" id="upg-energy">
+                <div class="upgrade-info">
+                    <div class="upgrade-name">🔋 Макс. энергия</div>
+                    <div class="upgrade-desc">Уровень <span id="energy-lvl">1</span> · +20 ед.</div>
+                </div>
+                <button class="upgrade-btn" id="btn-energy-upg">100 💎</button>
+            </div>
+            <div class="upgrade-item" id="upg-regen">
+                <div class="upgrade-info">
+                    <div class="upgrade-name">⚡ Регенерация</div>
+                    <div class="upgrade-desc">Уровень <span id="regen-lvl">1</span> · +0.5/сек</div>
+                </div>
+                <button class="upgrade-btn" id="btn-regen-upg">200 💎</button>
+            </div>
+            <div class="upgrade-item" id="upg-auto">
+                <div class="upgrade-info">
+                    <div class="upgrade-name">🤖 Автокликер</div>
+                    <div class="upgrade-desc">Уровень <span id="auto-lvl">0</span> · кликов/сек</div>
+                </div>
+                <button class="upgrade-btn" id="btn-auto-upg">500 💎</button>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-achievements">
+            <div class="achievements-list" id="achievements-container"></div>
+        </div>
+    </div>
+
+    <div id="achievement-popup" class="popup"></div>
+
+    <script>
+        (function() {
+            // ---------- ИГРОВЫЕ ПЕРЕМЕННЫЕ ----------
+            let coins = 0;
+            let energy = 100;
+            let maxEnergy = 100;
+            let energyRegen = 1.0;         // единиц в секунду
+            let clickPower = 1;            // монет за клик
+            let autoClickerCPS = 0;        // кликов автокликером в секунду
+
+            // Уровни апгрейдов
+            let clickLevel = 1;
+            let energyLevel = 1;
+            let regenLevel = 1;
+            let autoLevel = 0;
+
+            // Стоимости (базовые)
+            const BASE_COST_CLICK = 50;
+            const BASE_COST_ENERGY = 100;
+            const BASE_COST_REGEN = 200;
+            const BASE_COST_AUTO = 500;
+
+            let unlockedAchievements = [];
+            let clickTimestamps = [];
+            let dailyData = { date: '', count: 0 };
+            let lastTimestamp = Date.now();
+
+            // ---------- DOM ----------
+            const coinsDisplay = document.getElementById('coins-display');
+            const energyFill = document.getElementById('energy-fill');
+            const energyText = document.getElementById('energy-text');
+            const clickerImg = document.getElementById('clicker-img');
+            const clickerArea = document.getElementById('clicker-area');
+            const popup = document.getElementById('achievement-popup');
+
+            // Лабы уровней
+            const clickLvlSpan = document.getElementById('click-lvl');
+            const energyLvlSpan = document.getElementById('energy-lvl');
+            const regenLvlSpan = document.getElementById('regen-lvl');
+            const autoLvlSpan = document.getElementById('auto-lvl');
+
+            // Кнопки
+            const btnClickUpg = document.getElementById('btn-click-upg');
+            const btnEnergyUpg = document.getElementById('btn-energy-upg');
+            const btnRegenUpg = document.getElementById('btn-regen-upg');
+            const btnAutoUpg = document.getElementById('btn-auto-upg');
+
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+            const achievementsContainer = document.getElementById('achievements-container');
+
+            // Достижения конфиг
+            const achievementsConfig = {
+                night_clicker: { name: '🌙 Ночной кликер', desc: 'Клик между 02:00 и 04:59' },
+                speed_demon:   { name: '⚡ Секундный рекорд', desc: '10 кликов за 1 секунду' },
+                marathon:      { name: '🏃 Марафонец', desc: '200 кликов за 1 минуту' },
+                millionaire:   { name: '💰 Миллионер', desc: '1 000 000 монет' },
+                daily_10k:     { name: '📅 Дневной марафон', desc: '10 000 кликов за день' }
+            };
+
+            // ---------- ФУНКЦИИ ----------
+            function calcUpgradeCost(base, level) {
+                return Math.floor(base * Math.pow(1.5, level - 1));
+            }
+
+            function updateUpgradeButtons() {
+                const costClick = calcUpgradeCost(BASE_COST_CLICK, clickLevel);
+                const costEnergy = calcUpgradeCost(BASE_COST_ENERGY, energyLevel);
+                const costRegen = calcUpgradeCost(BASE_COST_REGEN, regenLevel);
+                const costAuto = calcUpgradeCost(BASE_COST_AUTO, autoLevel + 1); // autoLevel=0 => первый уровень
+
+                btnClickUpg.textContent = `${costClick} 💎`;
+                btnEnergyUpg.textContent = `${costEnergy} 💎`;
+                btnRegenUpg.textContent = `${costRegen} 💎`;
+                btnAutoUpg.textContent = autoLevel === 0 ? `${costAuto} 💎 (купить)` : `${costAuto} 💎`;
+
+                btnClickUpg.disabled = coins < costClick;
+                btnEnergyUpg.disabled = coins < costEnergy;
+                btnRegenUpg.disabled = coins < costRegen;
+                btnAutoUpg.disabled = coins < costAuto;
+
+                clickLvlSpan.textContent = clickLevel;
+                energyLvlSpan.textContent = energyLevel;
+                regenLvlSpan.textContent = regenLevel;
+                autoLvlSpan.textContent = autoLevel;
+            }
+
+            function getCurrentLevelImage() {
+                if (coins < 100) return 'photo1.png';
+                if (coins < 500) return 'photo2.png';
+                if (coins < 2000) return 'photo3.png';
+                if (coins < 10000) return 'photo4.png';
+                return 'photo5.png';
+            }
+
+            function updateUI() {
+                coinsDisplay.textContent = Math.floor(coins);
+                const energyPercent = Math.min(100, (energy / maxEnergy) * 100);
+                energyFill.style.width = `${energyPercent}%`;
+                energyText.textContent = `${Math.floor(energy)}/${maxEnergy}`;
+
+                clickerImg.src = getCurrentLevelImage();
+                if (energy < 1) {
+                    clickerImg.classList.add('no-energy');
+                } else {
+                    clickerImg.classList.remove('no-energy');
+                }
+                updateUpgradeButtons();
+                renderAchievements();
+            }
+
+            function renderAchievements() {
+                achievementsContainer.innerHTML = '';
+                unlockedAchievements.forEach(id => {
+                    const ach = achievementsConfig[id];
+                    if (ach) {
+                        const div = document.createElement('div');
+                        div.className = 'achievement';
+                        div.textContent = ach.name;
+                        achievementsContainer.appendChild(div);
+                    }
+                });
+                if (unlockedAchievements.length === 0) {
+                    achievementsContainer.innerHTML = '<div style="color:#7f8c9b; text-align:center; padding:1rem;">Пока нет достижений</div>';
+                }
+            }
+
+            function showPopup(message) {
+                popup.textContent = message;
+                popup.classList.add('show');
+                clearTimeout(popup._hideTimeout);
+                popup._hideTimeout = setTimeout(() => popup.classList.remove('show'), 3000);
+            }
+
+            function unlockAchievement(id) {
+                if (unlockedAchievements.includes(id)) return;
+                unlockedAchievements.push(id);
+                const ach = achievementsConfig[id];
+                if (ach) showPopup(`🏆 ${ach.name}: ${ach.desc}`);
+                saveGame();
+                renderAchievements();
+            }
+
+            function checkAchievementsOnClick() {
+                const now = new Date();
+                const hour = now.getHours();
+                if (hour >= 2 && hour < 5) unlockAchievement('night_clicker');
+
+                const ts = Date.now();
+                clickTimestamps.push(ts);
+                clickTimestamps = clickTimestamps.filter(t => ts - t <= 60000);
+
+                const lastSec = clickTimestamps.filter(t => ts - t <= 1000).length;
+                if (lastSec >= 10) unlockAchievement('speed_demon');
+
+                const lastMin = clickTimestamps.length;
+                if (lastMin >= 200) unlockAchievement('marathon');
+
+                // Дневной счётчик
+                const today = new Date().toISOString().split('T')[0];
+                if (dailyData.date !== today) {
+                    dailyData.date = today;
+                    dailyData.count = 0;
+                }
+                dailyData.count++;
+                if (dailyData.count >= 10000) unlockAchievement('daily_10k');
+            }
+
+            function saveGame() {
+                const state = {
+                    coins, energy, maxEnergy, energyRegen, clickPower, autoClickerCPS,
+                    clickLevel, energyLevel, regenLevel, autoLevel,
+                    unlockedAchievements, dailyData, lastTimestamp: Date.now()
+                };
+                localStorage.setItem('neonClickerSave', JSON.stringify(state));
+            }
+
+            function loadGame() {
+                const raw = localStorage.getItem('neonClickerSave');
+                if (!raw) return false;
+                try {
+                    const data = JSON.parse(raw);
+                    coins = data.coins ?? 0;
+                    energy = data.energy ?? 100;
+                    maxEnergy = data.maxEnergy ?? 100;
+                    energyRegen = data.energyRegen ?? 1;
+                    clickPower = data.clickPower ?? 1;
+                    autoClickerCPS = data.autoClickerCPS ?? 0;
+                    clickLevel = data.clickLevel ?? 1;
+                    energyLevel = data.energyLevel ?? 1;
+                    regenLevel = data.regenLevel ?? 1;
+                    autoLevel = data.autoLevel ?? 0;
+                    unlockedAchievements = data.unlockedAchievements ?? [];
+                    dailyData = data.dailyData ?? { date: '', count: 0 };
+                    lastTimestamp = data.lastTimestamp || Date.now();
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            function applyOfflineProgress() {
+                const now = Date.now();
+                let elapsed = (now - lastTimestamp) / 1000;
+                if (elapsed < 0) elapsed = 0;
+                const maxOffline = 8 * 3600; // 8 часов
+                elapsed = Math.min(elapsed, maxOffline);
+
+                // Восстановление энергии
+                const regenAmount = elapsed * energyRegen;
+                energy = Math.min(maxEnergy, energy + regenAmount);
+
+                // Автокликер (не тратит энергию)
+                const autoClicks = elapsed * autoClickerCPS;
+                coins += autoClicks * clickPower;
+
+                // Ежедневный счётчик не трогаем (нельзя достоверно)
+                lastTimestamp = now;
+                saveGame();
+            }
+
+            function performClick(e) {
+                if (energy < 1) {
+                    // Нет энергии — можно показать всплывашку, но не будем спамить
+                    return;
+                }
+                // Тратим энергию
+                energy = Math.max(0, energy - 1);
+                // Добавляем монеты
+                coins += clickPower;
+
+                // Визуальный эффект +X
+                const plus = document.createElement('div');
+                plus.className = 'click-value';
+                plus.textContent = `+${clickPower}`;
+                plus.style.left = (e.offsetX || e.clientX) + 'px';
+                plus.style.top = (e.offsetY || e.clientY) + 'px';
+                clickerArea.appendChild(plus);
+                plus.addEventListener('animationend', () => plus.remove());
+
+                checkAchievementsOnClick();
+                if (coins >= 1000000) unlockAchievement('millionaire');
+                updateUI();
+                saveGame();
+                if (navigator.vibrate) navigator.vibrate(10);
+            }
+
+            // Апгрейды
+            function buyUpgrade(type) {
+                let cost, success = false;
+                switch(type) {
+                    case 'click':
+                        cost = calcUpgradeCost(BASE_COST_CLICK, clickLevel);
+                        if (coins >= cost) {
+                            coins -= cost;
+                            clickLevel++;
+                            clickPower = clickLevel; // сила = уровню
+                            success = true;
+                        }
+                        break;
+                    case 'energy':
+                        cost = calcUpgradeCost(BASE_COST_ENERGY, energyLevel);
+                        if (coins >= cost) {
+                            coins -= cost;
+                            energyLevel++;
+                            maxEnergy += 20;
+                            energy = maxEnergy; // полное восстановление при покупке
+                            success = true;
+                        }
+                        break;
+                    case 'regen':
+                        cost = calcUpgradeCost(BASE_COST_REGEN, regenLevel);
+                        if (coins >= cost) {
+                            coins -= cost;
+                            regenLevel++;
+                            energyRegen += 0.5;
+                            success = true;
+                        }
+                        break;
+                    case 'auto':
+                        cost = calcUpgradeCost(BASE_COST_AUTO, autoLevel + 1);
+                        if (coins >= cost) {
+                            coins -= cost;
+                            autoLevel++;
+                            autoClickerCPS = autoLevel * 0.2; // 0.2 клика/с за уровень
+                            success = true;
+                        }
+                        break;
+                }
+                if (success) {
+                    updateUI();
+                    saveGame();
+                }
+            }
+
+            // Игровой цикл (регенерация и авто)
+            function gameTick() {
+                const now = Date.now();
+                const delta = (now - lastTimestamp) / 1000;
+                if (delta > 0) {
+                    // Регенерация
+                    energy = Math.min(maxEnergy, energy + delta * energyRegen);
+                    // Автокликер
+                    coins += delta * autoClickerCPS * clickPower;
+                    lastTimestamp = now;
+                    updateUI();
+                    saveGame();
+                }
+            }
+
+            // Переключение вкладок
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    tabBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    const tabId = btn.dataset.tab;
+                    tabContents.forEach(tc => tc.classList.remove('active'));
+                    document.getElementById('tab-' + tabId).classList.add('active');
+                });
+            });
+
+            // Инициализация
+            function init() {
+                const hasSave = loadGame();
+                if (!hasSave) {
+                    // значения по умолчанию уже установлены
+                }
+                applyOfflineProgress(); // учтём офлайн
+                updateUI();
+                renderAchievements();
+
+                // Обработчики
+                clickerImg.addEventListener('pointerdown', (e) => {
+                    e.preventDefault();
+                    performClick(e);
+                });
+                clickerImg.addEventListener('contextmenu', e => e.preventDefault());
+
+                btnClickUpg.addEventListener('click', () => buyUpgrade('click'));
+                btnEnergyUpg.addEventListener('click', () => buyUpgrade('energy'));
+                btnRegenUpg.addEventListener('click', () => buyUpgrade('regen'));
+                btnAutoUpg.addEventListener('click', () => buyUpgrade('auto'));
+
+                // Игровой тик 10 раз в секунду для плавности
+                setInterval(gameTick, 100);
+
+                // Сохранение при уходе
+                window.addEventListener('beforeunload', saveGame);
+            }
+
+            init();
+        })();
+    </script>
+</body>
+</html>
